@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>SignBridge — Real-Time Sign Language Communication</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=Fraunces:wght@500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --ink:#16233a;
+    --paper:#f6f4ee;
+    --panel:#ffffff;
+    --teal:#1f4d47;
+    --teal-deep:#12332f;
+    --gold:#c8912a;
+    --line:#d9d4c6;
+    --good:#2e7d5b;
+    --warn:#b5502e;
+    --focus:#0b5fff;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:'Atkinson Hyperlegible', system-ui, sans-serif;
+    font-size:18px;
+    line-height:1.5;
+  }
+  h1,h2,h3{font-family:'Fraunces', Georgia, serif; font-weight:600; margin:0;}
+  button{font-family:inherit;}
+  a{color:var(--teal);}
+
+  :focus-visible{outline:3px solid var(--focus); outline-offset:2px;}
+
+  header.top{
+    background:var(--teal-deep);
+    color:#f6f4ee;
+    padding:20px 28px;
+    display:flex;
+    align-items:baseline;
+    gap:14px;
+    border-bottom:4px solid var(--gold);
+  }
+  header.top h1{font-size:1.6rem; letter-spacing:0.01em;}
+  header.top p{margin:0; font-size:0.95rem; color:#cfe0da;}
+
+  main{
+    max-width:920px;
+    margin:0 auto;
+    padding:24px 20px 60px;
+  }
+
+  .mode-picker{
+    display:flex;
+    gap:14px;
+    flex-wrap:wrap;
+    margin-bottom:24px;
+  }
+  .mode-picker button{
+    flex:1 1 220px;
+    padding:18px 16px;
+    font-size:1.05rem;
+    border:2px solid var(--line);
+    background:var(--panel);
+    border-radius:10px;
+    cursor:pointer;
+    text-align:left;
+  }
+  .mode-picker button.active{
+    border-color:var(--teal);
+    box-shadow:inset 0 0 0 1px var(--teal);
+  }
+  .mode-picker button strong{display:block; font-family:'Fraunces',serif; font-size:1.15rem; margin-bottom:4px;}
+
+  .badge{
+    display:inline-block;
+    background:var(--gold);
+    color:#2a1c04;
+    font-weight:700;
+    font-size:0.85rem;
+    padding:3px 10px;
+    border-radius:999px;
+    margin-left:10px;
+  }
+
+  .session-panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:14px;
+    overflow:hidden;
+  }
+
+  .live-strip{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:14px 20px;
+    background:var(--teal);
+    color:white;
+  }
+  .live-strip .dot{
+    width:12px; height:12px; border-radius:50%;
+    background:#ff5a4e;
+  }
+  .live-strip .dot.off{background:#8fa39d;}
+
+  .camera-wrap{
+    position:relative;
+    background:#0e1b16;
+    aspect-ratio:4/3;
+    max-height:420px;
+  }
+  video, canvas{
+    position:absolute; top:0; left:0; width:100%; height:100%;
+    object-fit:cover;
+  }
+  .camera-guidance{
+    position:absolute; bottom:0; left:0; right:0;
+    background:rgba(14,27,22,0.82);
+    color:#fff;
+    padding:12px 16px;
+    font-size:1rem;
+    text-align:center;
+  }
+
+  .block{
+    padding:18px 20px;
+    border-top:1px solid var(--line);
+  }
+  .block .label{
+    font-size:0.85rem;
+    color:#5a6a63;
+    margin-bottom:6px;
+  }
+  .block .content{
+    font-size:1.35rem;
+    min-height:1.6em;
+  }
+  .block.recognition .content{color:var(--teal-deep); font-weight:700;}
+  .block.spoken .content{display:flex; align-items:center; gap:10px;}
+  .block.recipient .content{color:#3a3226;}
+
+  .controls{
+    display:flex;
+    flex-wrap:wrap;
+    gap:10px;
+    padding:16px 20px 20px;
+  }
+  .controls button{
+    padding:14px 18px;
+    font-size:1.02rem;
+    border-radius:9px;
+    border:2px solid var(--teal);
+    background:var(--teal);
+    color:#fff;
+    cursor:pointer;
+    min-width:150px;
+  }
+  .controls button.secondary{
+    background:transparent;
+    color:var(--teal-deep);
+  }
+  .controls button.mic-active{
+    background:var(--warn); border-color:var(--warn);
+  }
+  .controls button:disabled{opacity:0.5; cursor:not-allowed;}
+
+  .status-line{
+    padding:10px 20px 0;
+    font-size:0.95rem;
+    color:#5a6a63;
+    min-height:1.4em;
+  }
+  .status-line.error{color:var(--warn); font-weight:700;}
+
+  .vocab{
+    margin-top:26px;
+    padding:18px 20px;
+    background:#efe9d8;
+    border-radius:12px;
+    border:1px solid var(--line);
+  }
+  .vocab h3{font-size:1.1rem; margin-bottom:10px;}
+  .vocab .words{
+    display:flex; flex-wrap:wrap; gap:8px;
+  }
+  .vocab .words span{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:4px 10px;
+    font-size:0.9rem;
+  }
+
+  .privacy-note{
+    margin-top:18px;
+    font-size:0.9rem;
+    color:#5a6a63;
+  }
+
+  footer{
+    max-width:920px; margin:0 auto; padding:0 20px 40px; font-size:0.85rem; color:#6b6b60;
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <h1>SignBridge</h1>
+  <p>Real-time sign language communication assistant <span class="badge">Demo Recognition Model</span></p>
+</header>
+
+<main>
+
+  <div class="mode-picker" role="group" aria-label="Choose what SignBridge should do">
+    <button id="mode-live" class="active" aria-pressed="true">
+      <strong>Start live conversation</strong>
+      Two-way: sign to speech, and speech to text.
+    </button>
+    <button id="mode-sign-only" aria-pressed="false">
+      <strong>Sign → speech only</strong>
+      Just recognize signing and speak it aloud.
+    </button>
+    <button id="mode-speech-only" aria-pressed="false">
+      <strong>Speech → text only</strong>
+      Just show what's being said, for the signer to read.
+    </button>
+  </div>
+
+  <div class="session-panel">
+    <div class="live-strip">
+      <span id="live-dot" class="dot off" aria-hidden="true"></span>
+      <strong id="live-label">Not connected</strong>
+    </div>
+
+    <div class="camera-wrap" id="camera-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <canvas id="overlay"></canvas>
+      <div class="camera-guidance" id="camera-guidance">
+        Tap "Start camera" below, then position your hands inside the frame.
+      </div>
+    </div>
+
+    <div class="block recognition">
+      <div class="label">AI recognition (what it saw)</div>
+      <div class="content" id="recognition-text">—</div>
+    </div>
+
+    <div class="block spoken">
+      <div class="label">Spoken output</div>
+      <div class="content">
+        <span aria-hidden="true">🔊</span>
+        <span id="spoken-text">—</span>
+      </div>
+    </div>
+
+    <div class="block recipient">
+      <div class="label">Recipient's response</div>
+      <div class="content" id="recipient-text">—</div>
+    </div>
+
+    <div class="status-line" id="status-line" role="status" aria-live="polite"></div>
+
+    <div class="controls">
+      <button id="btn-camera">Start camera</button>
+      <button id="btn-mic" class="secondary">🎙️ Listen for reply</button>
+      <button id="btn-speak" class="secondary">🔊 Speak again</button>
+      <button id="btn-clear" class="secondary">Clear</button>
+      <button id="btn-end" class="secondary">End conversation</button>
+    </div>
+  </div>
+
+  <div class="vocab">
+    <h3>Demo vocabulary (21 signs)</h3>
+    <p style="margin:0 0 10px;font-size:0.92rem;color:#5a6a63;">
+      This prototype recognizes a small demo set of hand shapes, not full continuous sign language.
+      See the README for how to plug in a trained model with a much larger vocabulary.
+    </p>
+    <div class="words">
+      <span>HELLO</span><span>YES</span><span>NO</span><span>THANK YOU</span><span>PLEASE</span>
+      <span>HELP</span><span>WATER</span><span>FOOD</span><span>DOCTOR</span><span>HOSPITAL</span>
+      <span>WHERE</span><span>WHAT</span><span>WHO</span><span>I</span><span>YOU</span>
+      <span>NEED</span><span>GO</span><span>STOP</span><span>GOOD</span><span>BAD</span><span>SORRY</span>
+    </div>
+  </div>
+
+  <p class="privacy-note">
+    <strong>Privacy:</strong> your camera video and microphone audio never leave this browser.
+    Only hand/pose position data (numbers, not images) is sent to the SignBridge server, and
+    conversations are not stored unless you turn on saving in Settings.
+  </p>
+
+</main>
+
+<footer>
+  SignBridge prototype · demo recognition model · not a certified interpreter replacement
+</footer>
+
+(script removed to use dynamic import)
+<script>
+(function(){
+  "use strict";
+
+  // Prefer an explicit override, otherwise connect back to the same host
+  // that served the page so we don't accidentally target "localhost" vs "127.0.0.1".
+  const WS_URL = (window.SIGNBRIDGE_WS_URL) || ((location.protocol === 'https:') ? 'wss://' : 'ws://') + location.host + '/ws/live-conversation';
+
+  const el = {
+    video: document.getElementById('video'),
+    overlay: document.getElementById('overlay'),
+    liveDot: document.getElementById('live-dot'),
+    liveLabel: document.getElementById('live-label'),
+    guidance: document.getElementById('camera-guidance'),
+    recognitionText: document.getElementById('recognition-text'),
+    spokenText: document.getElementById('spoken-text'),
+    recipientText: document.getElementById('recipient-text'),
+    statusLine: document.getElementById('status-line'),
+    btnCamera: document.getElementById('btn-camera'),
+    btnMic: document.getElementById('btn-mic'),
+    btnSpeak: document.getElementById('btn-speak'),
+    btnClear: document.getElementById('btn-clear'),
+    btnEnd: document.getElementById('btn-end'),
+  };
+
+  let ws = null;
+  let handLandmarker = null;
+  let poseLandmarker = null;
+  let cameraStream = null;
+  let rafId = null;
+  let lastSpoken = "";
+  let recognizing = false; // Web Speech API state
+
+  // ---------------------------------------------------------------------
+  // WebSocket
+  // ---------------------------------------------------------------------
+  function connectWebSocket() {
+    console.info('Connecting WebSocket to', WS_URL);
+    ws = new WebSocket(WS_URL);
+    ws.onopen = () => {
+      console.info('WebSocket opened', WS_URL);
+      setLive(true, "Connected");
+      try { ws.send(JSON.stringify({ type: "start_session", consent_to_store: false })); } catch (e) { console.warn('Failed to send start_session', e); }
+    };
+    ws.onclose = (e) => {
+      console.warn('WebSocket closed', e);
+      setLive(false, "Disconnected");
+      setStatus('WebSocket disconnected: ' + (e.reason || e.code || 'closed'), true);
+    };
+    ws.onerror = (err) => {
+      console.error('WebSocket error connecting to', WS_URL, err);
+      setStatus('Could not reach the SignBridge server at ' + WS_URL + '. See console for details.', true);
+    };
+    ws.onmessage = (event) => {
+      const msg = JSON.parse(event.data);
+      handleServerMessage(msg);
+    };
+  }
+
+  function handleServerMessage(msg) {
+    switch (msg.type) {
+      case "session_started":
+        setStatus("Session ready (" + msg.model + " model).");
+        break;
+      case "recognition_update":
+        if (msg.status === "low_confidence") {
+          el.recognitionText.textContent = "Not sure what that sign was — please repeat.";
+        } else {
+          el.recognitionText.textContent = msg.sign + "  (" + Math.round(msg.confidence * 100) + "%)";
+        }
+        break;
+      case "sentence":
+        el.recognitionText.textContent = msg.tokens.join(" ");
+        break;
+      case "speak":
+        el.spokenText.textContent = msg.text;
+        speak(msg.text);
+        break;
+      case "recipient_text":
+        el.recipientText.textContent = msg.text;
+        break;
+      case "error":
+        setStatus(msg.message, true);
+        break;
+      default:
+        console.log("Unhandled message", msg);
+    }
+  }
+
+  function setLive(isLive, label) {
+    el.liveDot.classList.toggle("off", !isLive);
+    el.liveLabel.textContent = label;
+  }
+
+  function setStatus(text, isError) {
+    el.statusLine.textContent = text;
+    el.statusLine.classList.toggle("error", !!isError);
+  }
+
+  // ---------------------------------------------------------------------
+  // Text to speech (browser, per §10 default provider)
+  // ---------------------------------------------------------------------
+  function speak(text) {
+    if (!("speechSynthesis" in window)) {
+      setStatus("Speech output isn't supported in this browser.", true);
+      return;
+    }
+    lastSpoken = text;
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.rate = 1.0;
+    window.speechSynthesis.cancel();
+    window.speechSynthesis.speak(utterance);
+  }
+
+  el.btnSpeak.addEventListener("click", () => {
+    if (lastSpoken) speak(lastSpoken);
+  });
+
+  // ---------------------------------------------------------------------
+  // Speech to text (browser Web Speech API, per §11 default provider)
+  // ---------------------------------------------------------------------
+  let recognition = null;
+  function setupSpeechRecognition() {
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      setStatus("Speech recognition isn't supported in this browser (try Chrome).", true);
+      return null;
+    }
+    const r = new SpeechRecognition();
+    r.continuous = true;
+    r.interimResults = false;
+    r.lang = "en-US";
+    r.onresult = (event) => {
+      const transcript = event.results[event.results.length - 1][0].transcript.trim();
+      if (transcript && ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: "speech_text", text: transcript }));
+      }
+    };
+    r.onerror = (e) => setStatus("Microphone error: " + e.error, true);
+    r.onend = () => {
+      if (recognizing) r.start(); // keep listening (near-continuous, §11)
+    };
+    return r;
+  }
+
+  el.btnMic.addEventListener("click", () => {
+    if (!recognition) recognition = setupSpeechRecognition();
+    if (!recognition) return;
+
+    recognizing = !recognizing;
+    el.btnMic.classList.toggle("mic-active", recognizing);
+    el.btnMic.textContent = recognizing ? "🎙️ Listening… (tap to stop)" : "🎙️ Listen for reply";
+    if (recognizing) {
+      recognition.start();
+      setStatus("Listening for the recipient's reply.");
+    } else {
+      recognition.stop();
+      setStatus("");
+    }
+  });
+
+  // ---------------------------------------------------------------------
+  // Camera + MediaPipe landmark extraction (client-side, per §18 privacy/perf)
+  // ---------------------------------------------------------------------
+  let cameraOn = false;
+
+  async function loadVisionModuleWithFallback() {
+    // Prefer local vendor copy (if downloaded to frontend/vendor)
+    const localModule = '/vendor/vision_bundle.mjs';
+    const cdnUrls = [
+      'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js',
+      'https://unpkg.com/@mediapipe/tasks-vision@0.10.14/vision_bundle.js',
+    ];
+
+    // Try local dynamic import first
+    try {
+      const mod = await import(localModule);
+      return mod;
+    } catch (err) {
+      console.warn('Local dynamic import failed, falling back to CDN import/script:', err);
+    }
+
+    // Try dynamic import from CDN
+    try {
+      const mod = await import(cdnUrls[0]);
+      return mod;
+    } catch (err) {
+      console.warn('CDN dynamic import failed, falling back to script tag loading:', err);
+    }
+
+    // Fallback: inject script tags for each CDN URL and wait for globals.
+    for (const url of cdnUrls) {
+      try {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = url;
+          s.async = true;
+          s.onload = () => resolve();
+          s.onerror = (e) => reject(new Error('Failed to load ' + url));
+          document.head.appendChild(s);
+        });
+
+        // wait briefly for the script to attach globals
+        const waitForGlobals = (timeout = 3000) => new Promise((resolve, reject) => {
+          const start = Date.now();
+          (function check() {
+            if (window.FilesetResolver && window.HandLandmarker && window.PoseLandmarker) return resolve(true);
+            if (Date.now() - start > timeout) return reject(new Error('Timed out waiting for global exports'));
+            setTimeout(check, 100);
+          })();
+        });
+
+        await waitForGlobals(3000);
+        return { FilesetResolver: window.FilesetResolver, HandLandmarker: window.HandLandmarker, PoseLandmarker: window.PoseLandmarker };
+      } catch (e) {
+        console.warn('Script load attempt failed for', url, e);
+      }
+    }
+
+    throw new Error('Could not load MediaPipe Tasks Vision bundle from CDNs or local vendor. Check network/CSP and confirm /vendor files exist.');
+  }
+
+  async function initLandmarkers() {
+    setStatus('Loading hand-tracking model…');
+    let visionModule;
+    try {
+      visionModule = await loadVisionModuleWithFallback();
+    } catch (e) {
+      setStatus('Could not load the hand-tracking model: ' + e.message, true);
+      throw e;
+    }
+
+    const FilesetResolver = visionModule.FilesetResolver || (visionModule.default && visionModule.default.FilesetResolver) || window.FilesetResolver;
+    const HandLandmarker = visionModule.HandLandmarker || (visionModule.default && visionModule.default.HandLandmarker) || window.HandLandmarker;
+    const PoseLandmarker = visionModule.PoseLandmarker || (visionModule.default && visionModule.default.PoseLandmarker) || window.PoseLandmarker;
+
+    if (!FilesetResolver || !HandLandmarker || !PoseLandmarker) {
+      const msg = 'MediaPipe Tasks exports not found after loading.';
+      setStatus('Could not load the hand-tracking model: ' + msg, true);
+      throw new Error(msg);
+    }
+
+    // Use local wasm folder (served from /vendor/wasm) when available
+    const vision = await FilesetResolver.forVisionTasks('/vendor/wasm');
+
+    handLandmarker = await HandLandmarker.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/1/hand_landmarker.task' },
+      numHands: 2,
+      runningMode: 'VIDEO',
+    });
+    poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+      baseOptions: { modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task' },
+      numPoses: 1,
+      runningMode: 'VIDEO',
+    });
+
+    setStatus('Hand-tracking model loaded.');
+  }
+
+  async function startCamera() {
+    try {
+      cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+    } catch (e) {
+      setStatus("Camera unavailable: " + e.message, true);
+      return;
+    }
+    el.video.srcObject = cameraStream;
+    await el.video.play();
+
+    if (!handLandmarker) {
+      setStatus("Loading hand-tracking model…");
+      try {
+        await initLandmarkers();
+      } catch (e) {
+        setStatus("Could not load the hand-tracking model: " + e.message, true);
+        return;
+      }
+    }
+
+    cameraOn = true;
+    el.btnCamera.textContent = "Stop camera";
+    el.guidance.textContent = "Position your hands inside the frame and start signing.";
+    if (!ws || ws.readyState !== WebSocket.OPEN) connectWebSocket();
+    processFrame();
+  }
+
+  function stopCamera() {
+    cameraOn = false;
+    if (rafId) cancelAnimationFrame(rafId);
+    if (cameraStream) cameraStream.getTracks().forEach((t) => t.stop());
+    el.btnCamera.textContent = "Start camera";
+    el.guidance.textContent = "Tap \"Start camera\" below, then position your hands inside the frame.";
+  }
+
+  el.btnCamera.addEventListener("click", () => {
+    if (cameraOn) stopCamera(); else startCamera();
+  });
+
+  function toXYZ(landmarks) {
+    return landmarks ? landmarks.map((p) => [p.x, p.y, p.z]) : null;
+  }
+
+  function processFrame() {
+    if (!cameraOn) return;
+    const now = performance.now();
+
+    let leftHand = null, rightHand = null, pose = null;
+    try {
+      const handResult = handLandmarker.detectForVideo(el.video, now);
+      if (handResult.landmarks && handResult.landmarks.length) {
+        handResult.landmarks.forEach((lm, i) => {
+          const handedness = handResult.handedness[i][0].categoryName; // "Left" | "Right"
+          if (handedness === "Left") leftHand = toXYZ(lm); else rightHand = toXYZ(lm);
+        });
+      }
+      const poseResult = poseLandmarker.detectForVideo(el.video, now);
+      if (poseResult.landmarks && poseResult.landmarks.length) {
+        pose = toXYZ(poseResult.landmarks[0]);
+      }
+    } catch (e) {
+      // detector not ready yet on the very first frames -- skip silently
+    }
+
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({
+        type: "landmarks",
+        frame: { left_hand: leftHand, right_hand: rightHand, pose: pose, timestamp_ms: Math.round(now) },
+      }));
+    }
+
+    drawOverlay(leftHand, rightHand);
+    rafId = requestAnimationFrame(processFrame);
+  }
+
+  function drawOverlay(leftHand, rightHand) {
+    const canvas = el.overlay;
+    const ctx = canvas.getContext("2d");
+    canvas.width = el.video.videoWidth || canvas.clientWidth;
+    canvas.height = el.video.videoHeight || canvas.clientHeight;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = "#c8912a";
+    [leftHand, rightHand].forEach((hand) => {
+      if (!hand) return;
+      hand.forEach(([x, y]) => {
+        ctx.beginPath();
+        ctx.arc(x * canvas.width, y * canvas.height, 4, 0, 2 * Math.PI);
+        ctx.fill();
+      });
+    });
+  }
+
+  // ---------------------------------------------------------------------
+  // Simple controls
+  // ---------------------------------------------------------------------
+  el.btnClear.addEventListener("click", () => {
+    el.recognitionText.textContent = "—";
+    el.spokenText.textContent = "—";
+    el.recipientText.textContent = "—";
+    setStatus("");
+  });
+
+  el.btnEnd.addEventListener("click", () => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "end_session" }));
+      ws.close();
+    }
+    stopCamera();
+    setStatus("Conversation ended.");
+  });
+
+  // Mode picker (visual only in this single-page prototype -- all modes
+  // share one session panel; a full build would route to separate views)
+  const modeButtons = [document.getElementById("mode-live"),
+                        document.getElementById("mode-sign-only"),
+                        document.getElementById("mode-speech-only")];
+  modeButtons.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      modeButtons.forEach((b) => { b.classList.remove("active"); b.setAttribute("aria-pressed", "false"); });
+      btn.classList.add("active");
+      btn.setAttribute("aria-pressed", "true");
+    });
+  });
+
+  window.addEventListener("beforeunload", () => {
+    if (cameraStream) cameraStream.getTracks().forEach((t) => t.stop());
+  });
+})();
+</script>
+</body>
+</html>
