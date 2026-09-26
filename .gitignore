@@ -22,6 +22,10 @@ htmlcov/
 # Generated ML outputs and locally collected/training data
 checkpoints/
 data/landmarks/
-data/prepared.npz
+data/landmarks_*/
+data/prepared*.npz
 data/raw/*
 !data/raw/README.md
+
+# Temporary scratch directory
+scratch/

@@ -95,26 +95,51 @@ class LiveSession:
         await self.send({"type": "recipient_text", "text": text})
 
 
+from backend.sign_language.recognizer import _DEMO_MODE
+
+
 async def live_conversation_endpoint(websocket: WebSocket):
     await websocket.accept()
     session = LiveSession(websocket)
 
     try:
         while True:
-            message = await websocket.receive_json()
+            try:
+                message = await websocket.receive_json()
+            except (ValueError, TypeError, Exception) as parse_err:
+                if isinstance(parse_err, WebSocketDisconnect):
+                    raise parse_err
+                await session.send({
+                    "type": "error", "code": "bad_request",
+                    "message": "Invalid JSON format or malformed WebSocket payload."
+                })
+                continue
+
+            if not isinstance(message, dict):
+                await session.send({
+                    "type": "error", "code": "bad_request",
+                    "message": "WebSocket JSON payload must be an object."
+                })
+                continue
+
             msg_type = message.get("type")
 
             if msg_type == "start_session":
                 session.consent_to_store = bool(message.get("consent_to_store", False))
                 database.create_session(session.session_id, session.consent_to_store)
+                model_tag = "demo" if _DEMO_MODE else "production"
                 await session.send({"type": "session_started", "session_id": session.session_id,
-                                     "model": "demo"})
+                                     "model": model_tag})
 
             elif msg_type == "landmarks":
-                await session.handle_landmarks(message.get("frame", {}))
+                frame_data = message.get("frame")
+                if not isinstance(frame_data, dict):
+                    frame_data = {}
+                await session.handle_landmarks(frame_data)
 
             elif msg_type == "speech_text":
-                await session.handle_speech_text(message.get("text", ""))
+                text_val = str(message.get("text", ""))
+                await session.handle_speech_text(text_val)
 
             elif msg_type == "end_session":
                 await session.send({"type": "session_ended"})

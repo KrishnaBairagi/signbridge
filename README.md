@@ -16,18 +16,17 @@ everything runs on a live camera/microphone stream.
 
 - Live camera → MediaPipe hand/pose landmarks (extracted **in the browser**,
   so raw video never leaves the device)
-- Temporal gesture segmentation: start/end detection, debouncing, and a
-  cooldown so a held sign isn't repeated ("HELLO HELLO HELLO")
+- **61-Class Production Model** trained on 3,630 labeled sequences with full two-hand support (228 features/frame: left hand 63 + right hand 63 + pose 99 + 3 presence flags)
+- Continuous rolling-window inference (48 frames sequence length, ~1.6s window at 30 FPS) with ONNX Runtime CPU acceleration (~3.63 ms/window)
+- Temporal gesture segmentation: start/end detection, debouncing (2 matching predictions), and 0.8s cooldown so held signs aren't spammed
 - Rule-based sentence building from recognized tokens, with an optional,
   hallucination-guarded LLM polishing step
 - Browser text-to-speech (spoken output) and browser speech-to-text
   (near-continuous listening for the recipient's reply)
 - WebSocket-based live two-way session (`/ws/live-conversation`)
 - REST endpoints for testing recognition/translation in isolation
-- A fully swappable ML interface: replace the demo heuristic with a trained
-  LSTM/Transformer without touching any other file
-- A complete offline training pipeline (extract → prepare → train →
-  evaluate → export to ONNX) ready for real data
+- A complete swappable ML interface: supports heuristic demo mode as well as trained production ONNX/PyTorch models
+- A complete offline dataset pipeline and regression test suite (43 unit tests + 7 API integration tests)
 - Consent-gated storage (nothing is saved by default)
 
 ## 2. Architecture
@@ -94,10 +93,18 @@ Grant camera and microphone permissions when prompted.
   reliably distinguish only a handful of very distinct hand shapes
   (currently tuned for HELLO, YES, NO, WHERE/WHO, I, NEED — see the file for
   exact coverage). The UI shows a "Demo Recognition Model" badge at all times.
-- **Production Model (`DEMO_MODE=false`):** loads a trained model exported
-  to ONNX (see the training pipeline below). Swapping modes changes zero
-  other files — see `ARCHITECTURE.md` → "Design principle: recognition is
-  replaceable."
+- **Production Model (`DEMO_MODE=false`):** loads the trained 61-class BiLSTM ONNX model (`checkpoints/full_61/model.onnx`).
+
+### Production Model Validation Summary
+
+| Metric | Result | Description |
+| :--- | :---: | :--- |
+| **Held-Out Offline Test Accuracy** | **91.53%** | Evaluated on 543 held-out sequence windows (497/543 correct, Macro F1: 0.8221). |
+| **Dataset-Replay First-Event Accuracy** | **94.10%** | Full live pipeline replay across 305 evaluation videos (287/305 correct first event). |
+| **Dataset-Replay Any-Event Accuracy** | **96.07%** | Full live pipeline replay across 305 evaluation videos (293/305 correct event emitted). |
+| **ONNX Runtime CPU Latency** | **3.63 ms/window** | Measured single-window inference latency on CPU. |
+
+*Note: Dataset-replay metrics evaluate complete video streams through the live temporal state machine and should not be conflated with real-world webcam performance.*
 
 ## 7. Dataset preparation & model training
 
@@ -155,12 +162,12 @@ of `backend/websocket/live_conversation.py`.
 
 ## 9. Testing
 
-Core pipeline logic (no dependencies beyond `numpy`, runs immediately):
+Run full unit & regression test suite (43 tests):
 ```bash
-python -m unittest tests.test_core_logic -v
+python -m unittest discover -s tests -p "test_*.py"
 ```
 
-Full API/WebSocket tests (after `pip install -r requirements.txt`):
+Run API and WebSocket integration tests (7 tests):
 ```bash
 pytest tests/test_api.py -v
 ```

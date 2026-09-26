@@ -22,8 +22,8 @@ from .recognizer import recognize_sign, MIN_CONFIDENCE_HIGH, MIN_CONFIDENCE_MEDI
 
 @dataclass
 class BufferConfig:
-    window_size: int = 24          # frames kept for one recognition pass (~0.8s at 30fps)
-    min_frames_for_inference: int = 8
+    window_size: int = 48          # frames kept for one recognition pass (~1.6s at 30fps)
+    min_frames_for_inference: int = 48
     no_hand_frames_to_end_gesture: int = 6   # ~0.2s of no hands => gesture ended
     cooldown_seconds: float = 0.8            # min gap between two emitted signs
     stability_repeats_required: int = 2      # same top prediction N times running => confirm
@@ -60,10 +60,11 @@ class TemporalSignBuffer:
 
         if not has_hand:
             self._no_hand_streak += 1
-            self.frames.clear()
-            self._pending_sign, self._pending_repeats = None, 0
-            if self._no_hand_streak == self.config.no_hand_frames_to_end_gesture:
-                return RecognitionEvent(None, 0.0, "no_hands", "n/a")
+            if self._no_hand_streak >= self.config.no_hand_frames_to_end_gesture:
+                self.frames.clear()
+                self._pending_sign, self._pending_repeats = None, 0
+                if self._no_hand_streak == self.config.no_hand_frames_to_end_gesture:
+                    return RecognitionEvent(None, 0.0, "no_hands", "n/a")
             return None
 
         self._no_hand_streak = 0
@@ -95,7 +96,6 @@ class TemporalSignBuffer:
             self._last_emit_time = now
             self._last_confirmed_sign = sign
             self._pending_repeats = 0
-            self.frames.clear()  # start fresh window for the next gesture
             return RecognitionEvent(sign, confidence, "confirmed", model)
 
         if stable_enough:
