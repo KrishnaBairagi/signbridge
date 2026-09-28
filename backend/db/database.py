@@ -16,7 +16,9 @@ import sqlite3
 from contextlib import contextmanager
 from datetime import datetime, timezone
 
-DB_PATH = os.getenv("SIGNBRIDGE_DB_PATH", "signbridge.db")
+from backend.config import get_settings
+
+DB_PATH = get_settings().db_path
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS sessions (
@@ -40,13 +42,15 @@ CREATE TABLE IF NOT EXISTS messages (
 
 @contextmanager
 def get_connection():
-    conn = sqlite3.connect(DB_PATH)
+    db_path = get_settings().db_path
+    conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
         yield conn
         conn.commit()
     finally:
         conn.close()
+
 
 
 def init_db():

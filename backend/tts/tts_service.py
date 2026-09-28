@@ -69,8 +69,11 @@ class GoogleTTSProvider(TTSProvider):
         raise NotImplementedError("Google Cloud TTS integration point -- add SDK call here.")
 
 
+from backend.config import get_settings
+
+
 def get_tts_provider() -> TTSProvider:
-    provider = os.getenv("TTS_PROVIDER", "browser").lower()
+    provider = get_settings().tts_provider
     if provider == "browser":
         return BrowserTTSProvider()
     if provider == "azure":
@@ -78,3 +81,4 @@ def get_tts_provider() -> TTSProvider:
     if provider == "google":
         return GoogleTTSProvider()
     raise ValueError(f"Unknown TTS_PROVIDER: {provider}")
+

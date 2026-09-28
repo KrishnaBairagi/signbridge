@@ -95,7 +95,8 @@ class LiveSession:
         await self.send({"type": "recipient_text", "text": text})
 
 
-from backend.sign_language.recognizer import _DEMO_MODE
+from backend.config import get_settings
+from backend.logging_config import logger
 
 
 async def live_conversation_endpoint(websocket: WebSocket):
@@ -127,7 +128,9 @@ async def live_conversation_endpoint(websocket: WebSocket):
             if msg_type == "start_session":
                 session.consent_to_store = bool(message.get("consent_to_store", False))
                 database.create_session(session.session_id, session.consent_to_store)
-                model_tag = "demo" if _DEMO_MODE else "production"
+                demo_mode = get_settings().demo_mode
+                model_tag = "demo" if demo_mode else "production"
+                logger.info(f"WebSocket session started: {session.session_id} | model: {model_tag}")
                 await session.send({"type": "session_started", "session_id": session.session_id,
                                      "model": model_tag})
 
@@ -142,6 +145,7 @@ async def live_conversation_endpoint(websocket: WebSocket):
                 await session.handle_speech_text(text_val)
 
             elif msg_type == "end_session":
+                logger.info(f"WebSocket session ended gracefully: {session.session_id}")
                 await session.send({"type": "session_ended"})
                 break
 
@@ -150,4 +154,5 @@ async def live_conversation_endpoint(websocket: WebSocket):
                                      "message": f"Unrecognized message type: {msg_type}"})
 
     except WebSocketDisconnect:
-        pass
+        logger.info(f"WebSocket disconnected: {session.session_id}")
+

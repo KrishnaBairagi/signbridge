@@ -45,10 +45,14 @@ class WhisperSTTProvider(STTProvider):
         raise NotImplementedError("Whisper integration point -- add SDK/API call here.")
 
 
+from backend.config import get_settings
+
+
 def get_stt_provider() -> STTProvider:
-    provider = os.getenv("STT_PROVIDER", "browser").lower()
+    provider = get_settings().stt_provider
     if provider == "browser":
         return BrowserSTTProvider()
     if provider == "whisper":
         return WhisperSTTProvider()
     raise ValueError(f"Unknown STT_PROVIDER: {provider}")
+

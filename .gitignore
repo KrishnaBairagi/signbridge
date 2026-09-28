@@ -29,3 +29,10 @@ data/raw/*
 
 # Temporary scratch directory
 scratch/
+
+# Historical diagnostic & evaluation artifacts
+reports/live_*
+reports/phase10_*
+data/*_fast.json
+tests/test_live_61_phase*.py
+

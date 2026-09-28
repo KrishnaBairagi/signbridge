@@ -66,8 +66,11 @@ class GeminiConversationService(AIConversationService):
         raise NotImplementedError("Add Gemini Live/API call here using self.api_key.")
 
 
+from backend.config import get_settings
+
+
 def get_ai_conversation_service() -> AIConversationService:
-    provider = os.getenv("LLM_PROVIDER", "none").lower()
+    provider = get_settings().llm_provider
     if provider == "none":
         return NullAIConversationService()
     if provider == "openai":
@@ -75,3 +78,4 @@ def get_ai_conversation_service() -> AIConversationService:
     if provider == "gemini":
         return GeminiConversationService()
     raise ValueError(f"Unknown LLM_PROVIDER: {provider}")
+

@@ -50,16 +50,20 @@ def test_predict_no_hands():
     assert response.json()["sign"] is None
 
 
+from backend.config import get_settings
+
+
 def test_websocket_start_and_end_session():
     with client.websocket_connect("/ws/live-conversation") as ws:
         ws.send_json({"type": "start_session", "consent_to_store": False})
         msg = ws.receive_json()
         assert msg["type"] == "session_started"
-        assert msg["model"] == "demo"
+        assert msg["model"] == ("demo" if get_settings().demo_mode else "production")
 
         ws.send_json({"type": "end_session"})
         msg = ws.receive_json()
         assert msg["type"] == "session_ended"
+
 
 
 def test_websocket_speech_text_echoes_to_recipient_display():

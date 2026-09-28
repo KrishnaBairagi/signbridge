@@ -17,6 +17,8 @@ from fastapi.staticfiles import StaticFiles
 from backend.api.routes import router as api_router
 from backend.websocket.live_conversation import live_conversation_endpoint
 from backend.db.database import init_db
+from backend.config import get_settings
+from backend.logging_config import logger
 
 app = FastAPI(
     title="SignBridge API",
@@ -24,14 +26,11 @@ app = FastAPI(
     version="0.1.0",
 )
 
-ALLOWED_ORIGINS = os.getenv(
-    "CORS_ALLOWED_ORIGINS",
-    "http://localhost:3000,http://localhost:5500,http://127.0.0.1:8000,http://localhost:8000",
-).split(",")
+current_settings = get_settings()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=current_settings.cors_allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["*"],
@@ -60,11 +59,14 @@ app.mount('/vendor', StaticFiles(directory=str(FRONTEND_DIR / 'vendor')), name='
 @app.on_event("startup")
 def on_startup():
     init_db()
+    s = get_settings()
+    logger.info(f"SignBridge backend started | Mode: {'demo' if s.demo_mode else 'production'} | Model: {s.onnx_model_path}")
 
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "demo_mode": os.getenv("DEMO_MODE", "true")}
+    s = get_settings()
+    return {"status": "ok", "demo_mode": str(s.demo_mode).lower()}
 
 
 @app.websocket("/ws/live-conversation")

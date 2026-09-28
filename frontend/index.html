@@ -213,7 +213,7 @@
 
 <header class="top">
   <h1>SignBridge</h1>
-  <p>Real-time sign language communication assistant <span class="badge">Demo Recognition Model</span></p>
+  <p>Real-time sign language communication assistant <span class="badge" id="badge-model">Demo Recognition Model</span></p>
 </header>
 
 <main>
@@ -316,6 +316,7 @@
     overlay: document.getElementById('overlay'),
     liveDot: document.getElementById('live-dot'),
     liveLabel: document.getElementById('live-label'),
+    badgeModel: document.getElementById('badge-model'),
     guidance: document.getElementById('camera-guidance'),
     recognitionText: document.getElementById('recognition-text'),
     spokenText: document.getElementById('spoken-text'),
@@ -335,6 +336,9 @@
   let rafId = null;
   let lastSpoken = "";
   let recognizing = false; // Web Speech API state
+  let retryCount = 0;
+  const maxRetries = 5;
+  let userEndedSession = false;
 
   // ---------------------------------------------------------------------
   // WebSocket
@@ -344,17 +348,30 @@
     ws = new WebSocket(WS_URL);
     ws.onopen = () => {
       console.info('WebSocket opened', WS_URL);
+      retryCount = 0;
       setLive(true, "Connected");
       try { ws.send(JSON.stringify({ type: "start_session", consent_to_store: false })); } catch (e) { console.warn('Failed to send start_session', e); }
     };
     ws.onclose = (e) => {
       console.warn('WebSocket closed', e);
       setLive(false, "Disconnected");
-      setStatus('WebSocket disconnected: ' + (e.reason || e.code || 'closed'), true);
+      if (!userEndedSession && retryCount < maxRetries) {
+        const delayMs = Math.pow(2, retryCount) * 1000;
+        retryCount++;
+        setStatus(`WebSocket disconnected. Reconnecting in ${delayMs / 1000}s (attempt ${retryCount}/${maxRetries})…`, true);
+        setTimeout(() => {
+          if (!userEndedSession) {
+            connectWebSocket();
+          }
+        }, delayMs);
+      } else if (retryCount >= maxRetries) {
+        setStatus(`WebSocket connection lost. Max reconnect attempts (${maxRetries}) reached.`, true);
+      } else {
+        setStatus('WebSocket disconnected: ' + (e.reason || e.code || 'closed'), true);
+      }
     };
     ws.onerror = (err) => {
       console.error('WebSocket error connecting to', WS_URL, err);
-      setStatus('Could not reach the SignBridge server at ' + WS_URL + '. See console for details.', true);
     };
     ws.onmessage = (event) => {
       const msg = JSON.parse(event.data);
@@ -365,7 +382,10 @@
   function handleServerMessage(msg) {
     switch (msg.type) {
       case "session_started":
-        setStatus("Session ready (" + msg.model + " model).");
+        if (el.badgeModel) {
+          el.badgeModel.textContent = (msg.model === "production") ? "Production Model (61 Classes)" : "Demo Model";
+        }
+        setStatus("Session ready (" + (msg.model === "production" ? "Production Model (61 Classes)" : "Demo Model") + ").");
         break;
       case "recognition_update":
         if (msg.status === "low_confidence") {
@@ -585,6 +605,8 @@
     cameraOn = true;
     el.btnCamera.textContent = "Stop camera";
     el.guidance.textContent = "Position your hands inside the frame and start signing.";
+    userEndedSession = false;
+    retryCount = 0;
     if (!ws || ws.readyState !== WebSocket.OPEN) connectWebSocket();
     processFrame();
   }
@@ -665,6 +687,7 @@
   });
 
   el.btnEnd.addEventListener("click", () => {
+    userEndedSession = true;
     if (ws && ws.readyState === WebSocket.OPEN) {
       ws.send(JSON.stringify({ type: "end_session" }));
       ws.close();

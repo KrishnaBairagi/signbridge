@@ -424,7 +424,8 @@ class HeuristicSignClassifier:
 # Public entry point used by the rest of the app
 # ---------------------------------------------------------------------------
 
-_DEMO_MODE = os.getenv("DEMO_MODE", "true").lower() != "false"
+from backend.config import get_settings
+
 _classifier = HeuristicSignClassifier()
 _trained_classifier = None
 
@@ -448,12 +449,14 @@ def recognize_sign(sequence: list[FrameLandmarks]) -> dict:
     ml/inference/inference.py::TrainedSignClassifier.recognize() with the
     same return contract, then import it here instead of HeuristicSignClassifier.
     """
-    if _DEMO_MODE:
+    demo_mode = get_settings().demo_mode
+    if demo_mode:
         prediction = _classifier.recognize(sequence)
     else:
         prediction = _get_trained_classifier().recognize(sequence)
 
     if prediction is None:
-        return {"sign": None, "confidence": 0.0, "model": "demo" if _DEMO_MODE else "production"}
+        return {"sign": None, "confidence": 0.0, "model": "demo" if demo_mode else "production"}
     return prediction.to_dict()
+
 
