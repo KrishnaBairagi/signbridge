@@ -303,12 +303,22 @@
 </footer>
 
 (script removed to use dynamic import)
-<script>
 (function(){
   "use strict";
 
-  // Prefer an explicit override, otherwise connect back to the same host
-  // that served the page so we don't accidentally target "localhost" vs "127.0.0.1".
+  // State Machine definitions (§Task 2)
+  const State = {
+    IDLE: 'IDLE',
+    STARTING: 'STARTING',
+    CONNECTED: 'CONNECTED',
+    RECOGNIZING: 'RECOGNIZING',
+    RECONNECTING: 'RECONNECTING',
+    ENDING: 'ENDING'
+  };
+
+  let currentState = State.IDLE;
+  let currentMode = "live"; // "live" | "sign-only" | "speech-only"
+
   const WS_URL = (window.SIGNBRIDGE_WS_URL) || ((location.protocol === 'https:') ? 'wss://' : 'ws://') + location.host + '/ws/live-conversation';
 
   const el = {
@@ -327,6 +337,9 @@
     btnSpeak: document.getElementById('btn-speak'),
     btnClear: document.getElementById('btn-clear'),
     btnEnd: document.getElementById('btn-end'),
+    btnModeLive: document.getElementById('mode-live'),
+    btnModeSign: document.getElementById('mode-sign-only'),
+    btnModeSpeech: document.getElementById('mode-speech-only')
   };
 
   let ws = null;
@@ -335,81 +348,31 @@
   let cameraStream = null;
   let rafId = null;
   let lastSpoken = "";
+  let recognition = null;
   let recognizing = false; // Web Speech API state
   let retryCount = 0;
   const maxRetries = 5;
   let userEndedSession = false;
+  let reconnectTimer = null;
+  let cameraOn = false;
 
-  // ---------------------------------------------------------------------
-  // WebSocket
-  // ---------------------------------------------------------------------
-  function connectWebSocket() {
-    console.info('Connecting WebSocket to', WS_URL);
-    ws = new WebSocket(WS_URL);
-    ws.onopen = () => {
-      console.info('WebSocket opened', WS_URL);
-      retryCount = 0;
-      setLive(true, "Connected");
-      try { ws.send(JSON.stringify({ type: "start_session", consent_to_store: false })); } catch (e) { console.warn('Failed to send start_session', e); }
-    };
-    ws.onclose = (e) => {
-      console.warn('WebSocket closed', e);
-      setLive(false, "Disconnected");
-      if (!userEndedSession && retryCount < maxRetries) {
-        const delayMs = Math.pow(2, retryCount) * 1000;
-        retryCount++;
-        setStatus(`WebSocket disconnected. Reconnecting in ${delayMs / 1000}s (attempt ${retryCount}/${maxRetries})…`, true);
-        setTimeout(() => {
-          if (!userEndedSession) {
-            connectWebSocket();
-          }
-        }, delayMs);
-      } else if (retryCount >= maxRetries) {
-        setStatus(`WebSocket connection lost. Max reconnect attempts (${maxRetries}) reached.`, true);
-      } else {
-        setStatus('WebSocket disconnected: ' + (e.reason || e.code || 'closed'), true);
-      }
-    };
-    ws.onerror = (err) => {
-      console.error('WebSocket error connecting to', WS_URL, err);
-    };
-    ws.onmessage = (event) => {
-      const msg = JSON.parse(event.data);
-      handleServerMessage(msg);
-    };
-  }
+  // Expose state and mode for automated testing / debugging
+  window.__signbridge = {
+    getState: () => currentState,
+    getMode: () => currentMode,
+    isCameraOn: () => cameraOn,
+    isMicActive: () => recognizing,
+    getRetryCount: () => retryCount,
+    setMode: (mode) => switchMode(mode)
+  };
 
-  function handleServerMessage(msg) {
-    switch (msg.type) {
-      case "session_started":
-        if (el.badgeModel) {
-          el.badgeModel.textContent = (msg.model === "production") ? "Production Model (61 Classes)" : "Demo Model";
-        }
-        setStatus("Session ready (" + (msg.model === "production" ? "Production Model (61 Classes)" : "Demo Model") + ").");
-        break;
-      case "recognition_update":
-        if (msg.status === "low_confidence") {
-          el.recognitionText.textContent = "Not sure what that sign was — please repeat.";
-        } else {
-          el.recognitionText.textContent = msg.sign + "  (" + Math.round(msg.confidence * 100) + "%)";
-        }
-        break;
-      case "sentence":
-        el.recognitionText.textContent = msg.tokens.join(" ");
-        break;
-      case "speak":
-        el.spokenText.textContent = msg.text;
-        speak(msg.text);
-        break;
-      case "recipient_text":
-        el.recipientText.textContent = msg.text;
-        break;
-      case "error":
-        setStatus(msg.message, true);
-        break;
-      default:
-        console.log("Unhandled message", msg);
+  function transitionTo(newState, statusText, isError) {
+    console.info(`[State] ${currentState} -> ${newState}`);
+    currentState = newState;
+    if (statusText !== undefined) {
+      setStatus(statusText, isError);
     }
+    updateUIState();
   }
 
   function setLive(isLive, label) {
@@ -422,8 +385,258 @@
     el.statusLine.classList.toggle("error", !!isError);
   }
 
+  function updateUIState() {
+    const isEnding = currentState === State.ENDING;
+    el.btnEnd.disabled = currentState === State.IDLE || isEnding;
+    el.btnCamera.disabled = currentMode === "speech-only" || isEnding;
+    el.btnMic.disabled = currentMode === "sign-only" || isEnding;
+  }
+
   // ---------------------------------------------------------------------
-  // Text to speech (browser, per §10 default provider)
+  // Browser Capability Check (§Task 6)
+  // ---------------------------------------------------------------------
+  function checkCapabilities() {
+    const missing = [];
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) missing.push("Camera access (getUserMedia)");
+    if (!('WebSocket' in window)) missing.push("WebSocket API");
+    if (!('speechSynthesis' in window)) missing.push("Speech Synthesis (TTS)");
+
+    const hasSTT = !!(window.SpeechRecognition || window.webkitSpeechRecognition);
+
+    if (missing.length > 0) {
+      setStatus("Browser capability error: missing " + missing.join(", "), true);
+      return false;
+    }
+    if (!hasSTT) {
+      console.warn("Speech recognition (STT) not supported in this browser (try Chrome/Edge).");
+    }
+    return true;
+  }
+
+  // ---------------------------------------------------------------------
+  // Cleanup Functions (§Task 4)
+  // ---------------------------------------------------------------------
+  function stopCamera() {
+    cameraOn = false;
+    if (rafId) {
+      cancelAnimationFrame(rafId);
+      rafId = null;
+    }
+    if (cameraStream) {
+      cameraStream.getTracks().forEach((t) => t.stop());
+      cameraStream = null;
+    }
+    if (el.video) {
+      el.video.srcObject = null;
+    }
+    const canvas = el.overlay;
+    if (canvas) {
+      const ctx = canvas.getContext("2d");
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+    }
+    el.btnCamera.textContent = "Start camera";
+    if (currentMode === "speech-only") {
+      el.guidance.textContent = "Camera disabled in Speech-Only mode.";
+    } else {
+      el.guidance.textContent = 'Tap "Start camera" below, then position your hands inside the frame.';
+    }
+  }
+
+  function stopMicrophone() {
+    recognizing = false;
+    if (recognition) {
+      try { recognition.stop(); } catch (e) { /* ignore */ }
+      recognition = null;
+    }
+    el.btnMic.classList.remove("mic-active");
+    el.btnMic.textContent = "🎙️ Listen for reply";
+  }
+
+  function cleanupWebSocket() {
+    userEndedSession = true;
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+    if (ws) {
+      ws.onopen = ws.onclose = ws.onerror = ws.onmessage = null;
+      try {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: "end_session" }));
+        }
+        ws.close();
+      } catch (e) { /* ignore */ }
+      ws = null;
+    }
+    setLive(false, "Disconnected");
+  }
+
+  // ---------------------------------------------------------------------
+  // Mode Management (§Task 1)
+  // ---------------------------------------------------------------------
+  function switchMode(mode) {
+    if (currentMode === mode) return;
+    console.info("Switching mode from", currentMode, "to", mode);
+    currentMode = mode;
+
+    const buttons = [el.btnModeLive, el.btnModeSign, el.btnModeSpeech];
+    buttons.forEach((btn) => {
+      if (btn) {
+        btn.classList.remove("active");
+        btn.setAttribute("aria-pressed", "false");
+      }
+    });
+
+    if (mode === "live" && el.btnModeLive) {
+      el.btnModeLive.classList.add("active");
+      el.btnModeLive.setAttribute("aria-pressed", "true");
+    } else if (mode === "sign-only" && el.btnModeSign) {
+      el.btnModeSign.classList.add("active");
+      el.btnModeSign.setAttribute("aria-pressed", "true");
+    } else if (mode === "speech-only" && el.btnModeSpeech) {
+      el.btnModeSpeech.classList.add("active");
+      el.btnModeSpeech.setAttribute("aria-pressed", "true");
+    }
+
+    if (mode === "speech-only") {
+      stopCamera();
+      stopMicrophone();
+      el.recognitionText.textContent = "Disabled in Speech-Only mode.";
+      if (el.recipientText.textContent === "Disabled in Sign-Only mode.") {
+        el.recipientText.textContent = "—";
+      }
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        userEndedSession = false;
+        connectWebSocket();
+      }
+    } else if (mode === "sign-only") {
+      stopMicrophone();
+      el.recipientText.textContent = "Disabled in Sign-Only mode.";
+      if (el.recognitionText.textContent === "Disabled in Speech-Only mode.") {
+        el.recognitionText.textContent = "—";
+      }
+    } else { // "live"
+      if (el.recipientText.textContent === "Disabled in Sign-Only mode.") {
+        el.recipientText.textContent = "—";
+      }
+      if (el.recognitionText.textContent === "Disabled in Speech-Only mode.") {
+        el.recognitionText.textContent = "—";
+      }
+    }
+    updateUIState();
+  }
+
+  // ---------------------------------------------------------------------
+  // WebSocket Connection (§Task 3)
+  // ---------------------------------------------------------------------
+  function connectWebSocket() {
+    if (ws && (ws.readyState === WebSocket.OPEN || ws.readyState === WebSocket.CONNECTING)) {
+      console.info("WebSocket already connected or connecting, skipping duplicate connection.");
+      return;
+    }
+
+    if (reconnectTimer) {
+      clearTimeout(reconnectTimer);
+      reconnectTimer = null;
+    }
+
+    console.info('Connecting WebSocket to', WS_URL);
+    if (currentState !== State.RECONNECTING) {
+      transitionTo(State.STARTING, "Connecting to server...");
+    }
+
+    ws = new WebSocket(WS_URL);
+
+    ws.onopen = () => {
+      console.info('WebSocket opened', WS_URL);
+      retryCount = 0;
+      setLive(true, "Connected");
+      transitionTo(State.CONNECTED);
+      try {
+        ws.send(JSON.stringify({ type: "start_session", consent_to_store: false }));
+      } catch (e) {
+        console.warn('Failed to send start_session', e);
+      }
+    };
+
+    ws.onclose = (e) => {
+      console.warn('WebSocket closed', e);
+      setLive(false, "Disconnected");
+
+      if (!userEndedSession && retryCount < maxRetries) {
+        transitionTo(State.RECONNECTING);
+        const delayMs = Math.pow(2, retryCount) * 1000;
+        retryCount++;
+        setStatus(`WebSocket disconnected. Reconnecting in ${delayMs / 1000}s (attempt ${retryCount}/${maxRetries})…`, true);
+
+        reconnectTimer = setTimeout(() => {
+          reconnectTimer = null;
+          if (!userEndedSession) {
+            connectWebSocket();
+          }
+        }, delayMs);
+      } else if (retryCount >= maxRetries) {
+        transitionTo(State.IDLE, `WebSocket connection lost. Max reconnect attempts (${maxRetries}) reached.`, true);
+      } else {
+        transitionTo(State.IDLE, 'Session ended.');
+      }
+    };
+
+    ws.onerror = (err) => {
+      console.error('WebSocket error connecting to', WS_URL, err);
+      // onclose handles reconnect
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        handleServerMessage(msg);
+      } catch (err) {
+        console.error("Error parsing server WebSocket message", err);
+      }
+    };
+  }
+
+  function handleServerMessage(msg) {
+    switch (msg.type) {
+      case "session_started":
+        if (el.badgeModel) {
+          el.badgeModel.textContent = (msg.model === "production") ? "Production Model (61 Classes)" : "Demo Model";
+        }
+        transitionTo(State.CONNECTED, "Session ready (" + (msg.model === "production" ? "Production Model (61 Classes)" : "Demo Model") + ").");
+        break;
+      case "recognition_update":
+        if (msg.status === "low_confidence") {
+          el.recognitionText.textContent = "Not sure what that sign was — please repeat.";
+        } else if (msg.sign) {
+          el.recognitionText.textContent = msg.sign + "  (" + Math.round(msg.confidence * 100) + "%)";
+          if (currentState !== State.RECONNECTING) {
+            transitionTo(State.RECOGNIZING, "Recognizing signing...");
+          }
+        }
+        break;
+      case "sentence":
+        el.recognitionText.textContent = msg.tokens.join(" ");
+        break;
+      case "speak":
+        el.spokenText.textContent = msg.text;
+        speak(msg.text);
+        break;
+      case "recipient_text":
+        if (currentMode !== "sign-only") {
+          el.recipientText.textContent = msg.text;
+        }
+        break;
+      case "error":
+        setStatus(msg.message, true);
+        break;
+      default:
+        console.log("Unhandled server message type:", msg.type);
+    }
+  }
+
+  // ---------------------------------------------------------------------
+  // Text to speech (browser SpeechSynthesis)
   // ---------------------------------------------------------------------
   function speak(text) {
     if (!("speechSynthesis" in window)) {
@@ -442,13 +655,12 @@
   });
 
   // ---------------------------------------------------------------------
-  // Speech to text (browser Web Speech API, per §11 default provider)
+  // Speech to text (Web Speech API)
   // ---------------------------------------------------------------------
-  let recognition = null;
   function setupSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      setStatus("Speech recognition isn't supported in this browser (try Chrome).", true);
+      setStatus("Speech recognition isn't supported in this browser (try Chrome/Edge).", true);
       return null;
     }
     const r = new SpeechRecognition();
@@ -461,14 +673,24 @@
         ws.send(JSON.stringify({ type: "speech_text", text: transcript }));
       }
     };
-    r.onerror = (e) => setStatus("Microphone error: " + e.error, true);
+    r.onerror = (e) => {
+      console.warn("Microphone error:", e.error);
+      if (e.error === 'not-allowed') {
+        setStatus("Microphone permission required.", true);
+      } else {
+        setStatus("Microphone error: " + e.error, true);
+      }
+    };
     r.onend = () => {
-      if (recognizing) r.start(); // keep listening (near-continuous, §11)
+      if (recognizing && currentMode !== "sign-only" && currentState !== State.IDLE && currentState !== State.ENDING) {
+        try { r.start(); } catch (e) { /* ignore */ }
+      }
     };
     return r;
   }
 
   el.btnMic.addEventListener("click", () => {
+    if (currentMode === "sign-only") return;
     if (!recognition) recognition = setupSpeechRecognition();
     if (!recognition) return;
 
@@ -476,44 +698,42 @@
     el.btnMic.classList.toggle("mic-active", recognizing);
     el.btnMic.textContent = recognizing ? "🎙️ Listening… (tap to stop)" : "🎙️ Listen for reply";
     if (recognizing) {
-      recognition.start();
-      setStatus("Listening for the recipient's reply.");
+      try {
+        recognition.start();
+        setStatus("Listening for the recipient's reply.");
+      } catch (e) {
+        console.warn("Speech recognition start failed:", e);
+      }
     } else {
-      recognition.stop();
+      stopMicrophone();
       setStatus("");
     }
   });
 
   // ---------------------------------------------------------------------
-  // Camera + MediaPipe landmark extraction (client-side, per §18 privacy/perf)
+  // MediaPipe Vision Loading & Tracking
   // ---------------------------------------------------------------------
-  let cameraOn = false;
-
   async function loadVisionModuleWithFallback() {
-    // Prefer local vendor copy (if downloaded to frontend/vendor)
     const localModule = '/vendor/vision_bundle.mjs';
     const cdnUrls = [
       'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14/vision_bundle.js',
       'https://unpkg.com/@mediapipe/tasks-vision@0.10.14/vision_bundle.js',
     ];
 
-    // Try local dynamic import first
     try {
       const mod = await import(localModule);
       return mod;
     } catch (err) {
-      console.warn('Local dynamic import failed, falling back to CDN import/script:', err);
+      console.warn('Local dynamic import failed, trying CDN import:', err);
     }
 
-    // Try dynamic import from CDN
     try {
       const mod = await import(cdnUrls[0]);
       return mod;
     } catch (err) {
-      console.warn('CDN dynamic import failed, falling back to script tag loading:', err);
+      console.warn('CDN dynamic import failed, using script tag fallback:', err);
     }
 
-    // Fallback: inject script tags for each CDN URL and wait for globals.
     for (const url of cdnUrls) {
       try {
         await new Promise((resolve, reject) => {
@@ -525,7 +745,6 @@
           document.head.appendChild(s);
         });
 
-        // wait briefly for the script to attach globals
         const waitForGlobals = (timeout = 3000) => new Promise((resolve, reject) => {
           const start = Date.now();
           (function check() {
@@ -542,11 +761,11 @@
       }
     }
 
-    throw new Error('Could not load MediaPipe Tasks Vision bundle from CDNs or local vendor. Check network/CSP and confirm /vendor files exist.');
+    throw new Error('Could not load MediaPipe Tasks Vision bundle from CDNs or local vendor.');
   }
 
   async function initLandmarkers() {
-    setStatus('Loading hand-tracking model…');
+    transitionTo(State.STARTING, 'Loading hand-tracking model…');
     let visionModule;
     try {
       visionModule = await loadVisionModuleWithFallback();
@@ -565,7 +784,6 @@
       throw new Error(msg);
     }
 
-    // Use local wasm folder (served from /vendor/wasm) when available
     const vision = await FilesetResolver.forVisionTasks('/vendor/wasm');
 
     handLandmarker = await HandLandmarker.createFromOptions(vision, {
@@ -583,21 +801,40 @@
   }
 
   async function startCamera() {
+    if (cameraOn) {
+      console.info("Camera already running, ignoring duplicate start camera request.");
+      return;
+    }
+    if (currentMode === "speech-only") {
+      setStatus("Camera is disabled in Speech-Only mode.", true);
+      return;
+    }
+
+    transitionTo(State.STARTING, "Starting camera...");
     try {
       cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
     } catch (e) {
-      setStatus("Camera unavailable: " + e.message, true);
+      console.error("Camera access error:", e);
+      if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+        transitionTo(State.IDLE, "Camera permission required.", true);
+      } else {
+        transitionTo(State.IDLE, "Camera unavailable: " + e.message, true);
+      }
       return;
     }
     el.video.srcObject = cameraStream;
-    await el.video.play();
+    try {
+      await el.video.play();
+    } catch (e) {
+      console.warn("Video play error:", e);
+    }
 
     if (!handLandmarker) {
-      setStatus("Loading hand-tracking model…");
       try {
         await initLandmarkers();
       } catch (e) {
-        setStatus("Could not load the hand-tracking model: " + e.message, true);
+        stopCamera();
+        transitionTo(State.IDLE, "Could not load the hand-tracking model: " + e.message, true);
         return;
       }
     }
@@ -611,14 +848,6 @@
     processFrame();
   }
 
-  function stopCamera() {
-    cameraOn = false;
-    if (rafId) cancelAnimationFrame(rafId);
-    if (cameraStream) cameraStream.getTracks().forEach((t) => t.stop());
-    el.btnCamera.textContent = "Start camera";
-    el.guidance.textContent = "Tap \"Start camera\" below, then position your hands inside the frame.";
-  }
-
   el.btnCamera.addEventListener("click", () => {
     if (cameraOn) stopCamera(); else startCamera();
   });
@@ -628,7 +857,7 @@
   }
 
   function processFrame() {
-    if (!cameraOn) return;
+    if (!cameraOn || currentMode === "speech-only") return;
     const now = performance.now();
 
     let leftHand = null, rightHand = null, pose = null;
@@ -645,7 +874,7 @@
         pose = toXYZ(poseResult.landmarks[0]);
       }
     } catch (e) {
-      // detector not ready yet on the very first frames -- skip silently
+      // frame processing skipped during detector initialization
     }
 
     if (ws && ws.readyState === WebSocket.OPEN) {
@@ -661,9 +890,10 @@
 
   function drawOverlay(leftHand, rightHand) {
     const canvas = el.overlay;
+    if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    canvas.width = el.video.videoWidth || canvas.clientWidth;
-    canvas.height = el.video.videoHeight || canvas.clientHeight;
+    canvas.width = el.video.videoWidth || canvas.clientWidth || 640;
+    canvas.height = el.video.videoHeight || canvas.clientHeight || 480;
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = "#c8912a";
     [leftHand, rightHand].forEach((hand) => {
@@ -677,41 +907,36 @@
   }
 
   // ---------------------------------------------------------------------
-  // Simple controls
+  // User Actions (§Task 7)
   // ---------------------------------------------------------------------
   el.btnClear.addEventListener("click", () => {
-    el.recognitionText.textContent = "—";
+    if (currentMode !== "speech-only") el.recognitionText.textContent = "—";
     el.spokenText.textContent = "—";
-    el.recipientText.textContent = "—";
+    if (currentMode !== "sign-only") el.recipientText.textContent = "—";
     setStatus("");
   });
 
   el.btnEnd.addEventListener("click", () => {
-    userEndedSession = true;
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify({ type: "end_session" }));
-      ws.close();
-    }
+    transitionTo(State.ENDING, "Ending conversation...");
+    cleanupWebSocket();
     stopCamera();
-    setStatus("Conversation ended.");
+    stopMicrophone();
+    transitionTo(State.IDLE, "Conversation ended.");
   });
 
-  // Mode picker (visual only in this single-page prototype -- all modes
-  // share one session panel; a full build would route to separate views)
-  const modeButtons = [document.getElementById("mode-live"),
-                        document.getElementById("mode-sign-only"),
-                        document.getElementById("mode-speech-only")];
-  modeButtons.forEach((btn) => {
-    btn.addEventListener("click", () => {
-      modeButtons.forEach((b) => { b.classList.remove("active"); b.setAttribute("aria-pressed", "false"); });
-      btn.classList.add("active");
-      btn.setAttribute("aria-pressed", "true");
-    });
-  });
+  // Mode picker listeners (§Task 1)
+  if (el.btnModeLive) el.btnModeLive.addEventListener("click", () => switchMode("live"));
+  if (el.btnModeSign) el.btnModeSign.addEventListener("click", () => switchMode("sign-only"));
+  if (el.btnModeSpeech) el.btnModeSpeech.addEventListener("click", () => switchMode("speech-only"));
 
   window.addEventListener("beforeunload", () => {
-    if (cameraStream) cameraStream.getTracks().forEach((t) => t.stop());
+    cleanupWebSocket();
+    stopCamera();
+    stopMicrophone();
   });
+
+  // Initial Browser Capability Check on load
+  checkCapabilities();
 })();
 </script>
 </body>
