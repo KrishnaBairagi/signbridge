@@ -1,0 +1,47 @@
+{
+  "dataset_summary": {
+    "total_classes": 61,
+    "total_videos": 305,
+    "videos_per_class": 5
+  },
+  "phase9_production_metrics": {
+    "first_confirmed_correct": 221,
+    "first_confirmed_accuracy_pct": 72.46,
+    "any_confirmed_correct": 226,
+    "any_confirmed_accuracy_pct": 74.1,
+    "total_confirmed_events": 650,
+    "wrong_first_events": 16,
+    "no_event_videos": 63
+  },
+  "discrepancy_breakdown_categories": {
+    "CORRECT_FIRST_EVENT": 221,
+    "CORRECT_LATER_EVENT": 5,
+    "SINGLE_NO_HAND_WIPE": 63,
+    "WRONG_FIRST_EVENT": 16,
+    "NO_EVENT_LOW_CONF": 0,
+    "NO_EVENT_SHORT_STREAM": 0,
+    "COOLDOWN_BLOCKED": 0
+  },
+  "discrepancy_root_causes": {
+    "single_no_hand_wipe": {
+      "count": 63,
+      "mechanism": "Single 1-frame MediaPipe landmark detection drop triggers self.frames.clear() in add_frame(), wiping 48-frame deque.",
+      "fix_type": "Wipe deque only when no_hand_streak >= 6 (no_hand_frames_to_end_gesture)"
+    },
+    "transient_setup_motion": {
+      "count": 5,
+      "mechanism": "Early hand movement during frames 1-48 produces a transient high-confidence wrong prediction before the true gesture matures.",
+      "fix_type": "Debounce tuning, gesture onset filter, or selecting highest-confidence event"
+    },
+    "wrong_first_event": {
+      "count": 16,
+      "mechanism": "Model confusion or out-of-distribution dynamic sequence producing >=0.75 confidence for wrong sign.",
+      "fix_type": "Confidence threshold tuning or temporal smoothing"
+    },
+    "no_event_low_conf": {
+      "count": 0,
+      "mechanism": "Model prediction never maintained stability >=2 with confidence >=0.75 across rolling windows.",
+      "fix_type": "Model training data augmentation or threshold calibration"
+    }
+  }
+}

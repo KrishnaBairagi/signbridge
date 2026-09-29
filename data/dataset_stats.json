@@ -1,0 +1,523 @@
+{
+  "total_classes": 61,
+  "total_videos": 3630,
+  "total_frames": 300135,
+  "overall_hand_stats": {
+    "pct_0_hand": 1.0,
+    "pct_1_hand": 11.4,
+    "pct_2_hand": 87.6
+  },
+  "class_categories": {
+    "one_hand_classes": 0,
+    "two_hand_classes": 61,
+    "mixed_classes": 0
+  },
+  "class_breakdown": {
+    "BEAR": {
+      "videos": 60,
+      "total_frames": 6954,
+      "pct_0_hand": 1.0,
+      "pct_1_hand": 12.6,
+      "pct_2_hand": 86.4,
+      "category": "Two-Hand"
+    },
+    "BREAK": {
+      "videos": 60,
+      "total_frames": 3783,
+      "pct_0_hand": 3.5,
+      "pct_1_hand": 6.2,
+      "pct_2_hand": 90.2,
+      "category": "Two-Hand"
+    },
+    "BRINJAL": {
+      "videos": 60,
+      "total_frames": 5247,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 7.2,
+      "pct_2_hand": 92.8,
+      "category": "Two-Hand"
+    },
+    "BUDGET": {
+      "videos": 60,
+      "total_frames": 5097,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 9.9,
+      "pct_2_hand": 90.1,
+      "category": "Two-Hand"
+    },
+    "BUSY": {
+      "videos": 60,
+      "total_frames": 4677,
+      "pct_0_hand": 1.9,
+      "pct_1_hand": 19.1,
+      "pct_2_hand": 79.0,
+      "category": "Two-Hand"
+    },
+    "CABBAGE": {
+      "videos": 60,
+      "total_frames": 5661,
+      "pct_0_hand": 1.5,
+      "pct_1_hand": 19.3,
+      "pct_2_hand": 79.2,
+      "category": "Two-Hand"
+    },
+    "CARROT": {
+      "videos": 60,
+      "total_frames": 4506,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 8.6,
+      "pct_2_hand": 91.4,
+      "category": "Two-Hand"
+    },
+    "CAULIFLOWER": {
+      "videos": 60,
+      "total_frames": 5127,
+      "pct_0_hand": 1.7,
+      "pct_1_hand": 17.0,
+      "pct_2_hand": 81.3,
+      "category": "Two-Hand"
+    },
+    "CHILLI": {
+      "videos": 60,
+      "total_frames": 3999,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 9.3,
+      "pct_2_hand": 90.7,
+      "category": "Two-Hand"
+    },
+    "CLEAN": {
+      "videos": 60,
+      "total_frames": 4488,
+      "pct_0_hand": 2.1,
+      "pct_1_hand": 16.3,
+      "pct_2_hand": 81.6,
+      "category": "Two-Hand"
+    },
+    "CLOSE": {
+      "videos": 60,
+      "total_frames": 4035,
+      "pct_0_hand": 2.8,
+      "pct_1_hand": 6.4,
+      "pct_2_hand": 90.8,
+      "category": "Two-Hand"
+    },
+    "COME": {
+      "videos": 60,
+      "total_frames": 3636,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 9.6,
+      "pct_2_hand": 90.4,
+      "category": "Two-Hand"
+    },
+    "COOK": {
+      "videos": 60,
+      "total_frames": 6690,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 9.0,
+      "pct_2_hand": 91.0,
+      "category": "Two-Hand"
+    },
+    "CROCODILE": {
+      "videos": 60,
+      "total_frames": 6894,
+      "pct_0_hand": 1.5,
+      "pct_1_hand": 15.9,
+      "pct_2_hand": 82.6,
+      "category": "Two-Hand"
+    },
+    "CRY": {
+      "videos": 60,
+      "total_frames": 4848,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 7.5,
+      "pct_2_hand": 92.5,
+      "category": "Two-Hand"
+    },
+    "CUCUMBER": {
+      "videos": 60,
+      "total_frames": 6207,
+      "pct_0_hand": 1.1,
+      "pct_1_hand": 7.4,
+      "pct_2_hand": 91.5,
+      "category": "Two-Hand"
+    },
+    "DEER": {
+      "videos": 60,
+      "total_frames": 5169,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 8.4,
+      "pct_2_hand": 91.6,
+      "category": "Two-Hand"
+    },
+    "DRINK": {
+      "videos": 60,
+      "total_frames": 4092,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 10.2,
+      "pct_2_hand": 89.8,
+      "category": "Two-Hand"
+    },
+    "ELEPHANT": {
+      "videos": 60,
+      "total_frames": 5217,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 9.1,
+      "pct_2_hand": 90.9,
+      "category": "Two-Hand"
+    },
+    "EXAM": {
+      "videos": 60,
+      "total_frames": 4653,
+      "pct_0_hand": 2.0,
+      "pct_1_hand": 9.5,
+      "pct_2_hand": 88.5,
+      "category": "Two-Hand"
+    },
+    "FEDUP": {
+      "videos": 60,
+      "total_frames": 3732,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 8.8,
+      "pct_2_hand": 91.2,
+      "category": "Two-Hand"
+    },
+    "FEVER": {
+      "videos": 60,
+      "total_frames": 5385,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 7.0,
+      "pct_2_hand": 93.0,
+      "category": "Two-Hand"
+    },
+    "GIRAFFE": {
+      "videos": 60,
+      "total_frames": 6858,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 5.7,
+      "pct_2_hand": 94.3,
+      "category": "Two-Hand"
+    },
+    "GIVE": {
+      "videos": 60,
+      "total_frames": 3573,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 5.0,
+      "pct_2_hand": 95.0,
+      "category": "Two-Hand"
+    },
+    "GOOD_AFTERNOON": {
+      "videos": 60,
+      "total_frames": 4713,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 8.7,
+      "pct_2_hand": 91.3,
+      "category": "Two-Hand"
+    },
+    "GOOD_MORNING": {
+      "videos": 60,
+      "total_frames": 4575,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 13.3,
+      "pct_2_hand": 86.7,
+      "category": "Two-Hand"
+    },
+    "HELLO": {
+      "videos": 60,
+      "total_frames": 3744,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 12.5,
+      "pct_2_hand": 87.5,
+      "category": "Two-Hand"
+    },
+    "HUG": {
+      "videos": 60,
+      "total_frames": 4629,
+      "pct_0_hand": 4.6,
+      "pct_1_hand": 15.1,
+      "pct_2_hand": 80.3,
+      "category": "Two-Hand"
+    },
+    "INJURY": {
+      "videos": 60,
+      "total_frames": 4050,
+      "pct_0_hand": 2.0,
+      "pct_1_hand": 18.8,
+      "pct_2_hand": 79.2,
+      "category": "Two-Hand"
+    },
+    "INTERVIEW": {
+      "videos": 60,
+      "total_frames": 4539,
+      "pct_0_hand": 2.5,
+      "pct_1_hand": 8.5,
+      "pct_2_hand": 89.0,
+      "category": "Two-Hand"
+    },
+    "JUMP": {
+      "videos": 60,
+      "total_frames": 6093,
+      "pct_0_hand": 0.2,
+      "pct_1_hand": 7.0,
+      "pct_2_hand": 92.8,
+      "category": "Two-Hand"
+    },
+    "KARNATAKA": {
+      "videos": 60,
+      "total_frames": 4155,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 13.7,
+      "pct_2_hand": 86.3,
+      "category": "Two-Hand"
+    },
+    "KEY": {
+      "videos": 60,
+      "total_frames": 4578,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 7.2,
+      "pct_2_hand": 92.8,
+      "category": "Two-Hand"
+    },
+    "KNIFE": {
+      "videos": 60,
+      "total_frames": 5316,
+      "pct_0_hand": 1.1,
+      "pct_1_hand": 11.0,
+      "pct_2_hand": 87.9,
+      "category": "Two-Hand"
+    },
+    "LEMON": {
+      "videos": 60,
+      "total_frames": 4134,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 7.9,
+      "pct_2_hand": 92.1,
+      "category": "Two-Hand"
+    },
+    "LION": {
+      "videos": 60,
+      "total_frames": 4659,
+      "pct_0_hand": 1.0,
+      "pct_1_hand": 18.5,
+      "pct_2_hand": 80.4,
+      "category": "Two-Hand"
+    },
+    "MAN": {
+      "videos": 60,
+      "total_frames": 4710,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 8.2,
+      "pct_2_hand": 91.8,
+      "category": "Two-Hand"
+    },
+    "MATHS": {
+      "videos": 60,
+      "total_frames": 4353,
+      "pct_0_hand": 3.1,
+      "pct_1_hand": 19.0,
+      "pct_2_hand": 77.9,
+      "category": "Two-Hand"
+    },
+    "MAYBE": {
+      "videos": 60,
+      "total_frames": 4566,
+      "pct_0_hand": 1.2,
+      "pct_1_hand": 14.8,
+      "pct_2_hand": 84.0,
+      "category": "Two-Hand"
+    },
+    "MONKEY": {
+      "videos": 60,
+      "total_frames": 4380,
+      "pct_0_hand": 0.9,
+      "pct_1_hand": 2.6,
+      "pct_2_hand": 96.5,
+      "category": "Two-Hand"
+    },
+    "ONION": {
+      "videos": 60,
+      "total_frames": 4590,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 7.6,
+      "pct_2_hand": 92.4,
+      "category": "Two-Hand"
+    },
+    "PEACOCK": {
+      "videos": 60,
+      "total_frames": 4425,
+      "pct_0_hand": 2.6,
+      "pct_1_hand": 5.8,
+      "pct_2_hand": 91.5,
+      "category": "Two-Hand"
+    },
+    "PIGEON": {
+      "videos": 60,
+      "total_frames": 6168,
+      "pct_0_hand": 4.7,
+      "pct_1_hand": 15.4,
+      "pct_2_hand": 80.0,
+      "category": "Two-Hand"
+    },
+    "POUR": {
+      "videos": 60,
+      "total_frames": 4017,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 6.3,
+      "pct_2_hand": 93.7,
+      "category": "Two-Hand"
+    },
+    "RADISH": {
+      "videos": 60,
+      "total_frames": 4245,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 8.7,
+      "pct_2_hand": 91.3,
+      "category": "Two-Hand"
+    },
+    "SPARROW": {
+      "videos": 60,
+      "total_frames": 5871,
+      "pct_0_hand": 3.1,
+      "pct_1_hand": 15.8,
+      "pct_2_hand": 81.1,
+      "category": "Two-Hand"
+    },
+    "STILL": {
+      "videos": 30,
+      "total_frames": 3312,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 6.9,
+      "pct_2_hand": 93.1,
+      "category": "Two-Hand"
+    },
+    "SWITCH": {
+      "videos": 60,
+      "total_frames": 4218,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 8.3,
+      "pct_2_hand": 91.7,
+      "category": "Two-Hand"
+    },
+    "TEA": {
+      "videos": 60,
+      "total_frames": 6825,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 6.3,
+      "pct_2_hand": 93.7,
+      "category": "Two-Hand"
+    },
+    "TEMPLE": {
+      "videos": 60,
+      "total_frames": 7170,
+      "pct_0_hand": 5.3,
+      "pct_1_hand": 21.2,
+      "pct_2_hand": 73.5,
+      "category": "Two-Hand"
+    },
+    "THANK_YOU": {
+      "videos": 60,
+      "total_frames": 3855,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 8.4,
+      "pct_2_hand": 91.6,
+      "category": "Two-Hand"
+    },
+    "TIGER": {
+      "videos": 60,
+      "total_frames": 5382,
+      "pct_0_hand": 0.6,
+      "pct_1_hand": 14.7,
+      "pct_2_hand": 84.7,
+      "category": "Two-Hand"
+    },
+    "TURTLE": {
+      "videos": 60,
+      "total_frames": 5406,
+      "pct_0_hand": 0.9,
+      "pct_1_hand": 33.2,
+      "pct_2_hand": 65.8,
+      "category": "Two-Hand"
+    },
+    "UMBRELLA": {
+      "videos": 60,
+      "total_frames": 5016,
+      "pct_0_hand": 1.6,
+      "pct_1_hand": 11.2,
+      "pct_2_hand": 87.2,
+      "category": "Two-Hand"
+    },
+    "UNCLE": {
+      "videos": 60,
+      "total_frames": 5505,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 7.4,
+      "pct_2_hand": 92.6,
+      "category": "Two-Hand"
+    },
+    "VEGETABLES": {
+      "videos": 60,
+      "total_frames": 5667,
+      "pct_0_hand": 1.0,
+      "pct_1_hand": 8.8,
+      "pct_2_hand": 90.2,
+      "category": "Two-Hand"
+    },
+    "VOLCANO": {
+      "videos": 60,
+      "total_frames": 4749,
+      "pct_0_hand": 1.2,
+      "pct_1_hand": 13.3,
+      "pct_2_hand": 85.4,
+      "category": "Two-Hand"
+    },
+    "WHAT_IS_YOUR_NAME": {
+      "videos": 60,
+      "total_frames": 5364,
+      "pct_0_hand": 0.6,
+      "pct_1_hand": 16.4,
+      "pct_2_hand": 83.0,
+      "category": "Two-Hand"
+    },
+    "WIFE": {
+      "videos": 60,
+      "total_frames": 5403,
+      "pct_0_hand": 0.3,
+      "pct_1_hand": 8.1,
+      "pct_2_hand": 91.6,
+      "category": "Two-Hand"
+    },
+    "WRITER": {
+      "videos": 60,
+      "total_frames": 4590,
+      "pct_0_hand": 1.4,
+      "pct_1_hand": 10.5,
+      "pct_2_hand": 88.1,
+      "category": "Two-Hand"
+    },
+    "WRONG": {
+      "videos": 60,
+      "total_frames": 4635,
+      "pct_0_hand": 0.0,
+      "pct_1_hand": 17.3,
+      "pct_2_hand": 82.7,
+      "category": "Two-Hand"
+    }
+  },
+  "npz_info": {
+    "X_train_shape": [
+      2544,
+      48,
+      228
+    ],
+    "X_val_shape": [
+      543,
+      48,
+      228
+    ],
+    "X_test_shape": [
+      543,
+      48,
+      228
+    ],
+    "num_classes": 61
+  }
+}
