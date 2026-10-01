@@ -144,6 +144,27 @@ async def live_conversation_endpoint(websocket: WebSocket):
                 text_val = str(message.get("text", ""))
                 await session.handle_speech_text(text_val)
 
+            elif msg_type == "ping":
+                import time
+                ts = message.get("timestamp_ms", int(time.time() * 1000))
+                await session.send({"type": "pong", "timestamp_ms": ts})
+
+            elif msg_type == "clear_history":
+                session.token_history = []
+                session.buffer.frames.clear()
+                await session.send({"type": "history_cleared", "session_id": session.session_id})
+
+            elif msg_type == "get_session_info":
+                demo_mode = get_settings().demo_mode
+                model_tag = "demo" if demo_mode else "production"
+                await session.send({
+                    "type": "session_info",
+                    "session_id": session.session_id,
+                    "model": model_tag,
+                    "consent_to_store": session.consent_to_store,
+                    "token_count": len(session.token_history),
+                })
+
             elif msg_type == "end_session":
                 logger.info(f"WebSocket session ended gracefully: {session.session_id}")
                 await session.send({"type": "session_ended"})

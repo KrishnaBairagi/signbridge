@@ -302,7 +302,7 @@
   SignBridge prototype · demo recognition model · not a certified interpreter replacement
 </footer>
 
-(script removed to use dynamic import)
+<script>
 (function(){
   "use strict";
 
@@ -452,8 +452,14 @@
     el.btnMic.textContent = "🎙️ Listen for reply";
   }
 
+  let pingInterval = null;
+
   function cleanupWebSocket() {
     userEndedSession = true;
+    if (pingInterval) {
+      clearInterval(pingInterval);
+      pingInterval = null;
+    }
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
       reconnectTimer = null;
@@ -552,6 +558,12 @@
       retryCount = 0;
       setLive(true, "Connected");
       transitionTo(State.CONNECTED);
+      if (pingInterval) clearInterval(pingInterval);
+      pingInterval = setInterval(() => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+          try { ws.send(JSON.stringify({ type: "ping", timestamp_ms: Date.now() })); } catch (e) {}
+        }
+      }, 15000);
       try {
         ws.send(JSON.stringify({ type: "start_session", consent_to_store: false }));
       } catch (e) {
@@ -562,6 +574,10 @@
     ws.onclose = (e) => {
       console.warn('WebSocket closed', e);
       setLive(false, "Disconnected");
+      if (pingInterval) {
+        clearInterval(pingInterval);
+        pingInterval = null;
+      }
 
       if (!userEndedSession && retryCount < maxRetries) {
         transitionTo(State.RECONNECTING);
@@ -626,6 +642,16 @@
         if (currentMode !== "sign-only") {
           el.recipientText.textContent = msg.text;
         }
+        break;
+      case "pong":
+        // Heartbeat response received cleanly
+        break;
+      case "history_cleared":
+        el.recognitionText.textContent = "—";
+        setStatus("Conversation history cleared.");
+        break;
+      case "session_info":
+        console.info("Session info received:", msg);
         break;
       case "error":
         setStatus(msg.message, true);
@@ -810,13 +836,34 @@
       return;
     }
 
+    if (window.location.protocol === 'file:') {
+      transitionTo(State.IDLE, "Camera access (getUserMedia) requires an HTTP server (e.g. http://localhost:8000). Please open SignBridge via the backend server instead of file://.", true);
+      return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      transitionTo(State.IDLE, "Camera API (getUserMedia) is not supported or is blocked in this browser context.", true);
+      return;
+    }
+
     transitionTo(State.STARTING, "Starting camera...");
     try {
-      cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      try {
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      } catch (e1) {
+        console.warn("User facing camera constraint failed, retrying with fallback video constraints:", e1);
+        cameraStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
     } catch (e) {
       console.error("Camera access error:", e);
       if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
-        transitionTo(State.IDLE, "Camera permission required.", true);
+        transitionTo(State.IDLE, "Camera permission denied. Please allow camera access in your browser settings.", true);
+      } else if (e.name === 'NotFoundError' || e.name === 'DevicesNotFoundError') {
+        transitionTo(State.IDLE, "No camera device found on your system.", true);
+      } else if (e.name === 'NotReadableError' || e.name === 'TrackStartError') {
+        transitionTo(State.IDLE, "Camera is already in use by another application (e.g. Zoom, Teams, Discord). Please close other apps and try again.", true);
+      } else if (e.name === 'OverconstrainedError') {
+        transitionTo(State.IDLE, "Camera hardware constraints not supported by your camera.", true);
       } else {
         transitionTo(State.IDLE, "Camera unavailable: " + e.message, true);
       }

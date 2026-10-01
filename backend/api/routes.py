@@ -76,3 +76,57 @@ def synthesize_speech(req: TTSRequest):
         raise HTTPException(status_code=501, detail=str(e))
     from fastapi.responses import Response
     return Response(content=audio_bytes, media_type="audio/mpeg")
+
+
+@router.get("/model/info")
+def get_model_info():
+    from backend.config import get_settings
+    settings = get_settings()
+    demo_mode = settings.demo_mode
+    if demo_mode:
+        return {
+            "model_type": "demo",
+            "name": "HeuristicSignClassifier",
+            "class_count": 21,
+            "sequence_len": settings.max_seq_len,
+            "features_per_frame": 228,
+        }
+    else:
+        return {
+            "model_type": "production",
+            "name": "BiLSTM 61-Class ONNX Model",
+            "class_count": 61,
+            "sequence_len": settings.max_seq_len,
+            "features_per_frame": 228,
+            "model_path": settings.onnx_model_path,
+            "labels_path": settings.labels_path,
+        }
+
+
+@router.get("/sessions/{session_id}")
+def get_session_details(session_id: str):
+    from backend.db import database
+    with database.get_connection() as conn:
+        session = conn.execute(
+            "SELECT id, started_at, consent_to_store, vocabulary_mode FROM sessions WHERE id = ?",
+            (session_id,),
+        ).fetchone()
+        if not session:
+            raise HTTPException(status_code=404, detail=f"Session '{session_id}' not found.")
+
+        session_dict = dict(session)
+        if not session_dict["consent_to_store"]:
+            return {
+                "session": session_dict,
+                "messages": [],
+                "note": "Session transcript storage was not consented by user."
+            }
+
+        messages = conn.execute(
+            "SELECT id, direction, content, confidence, created_at FROM messages WHERE session_id = ? ORDER BY id ASC",
+            (session_id,),
+        ).fetchall()
+        return {
+            "session": session_dict,
+            "messages": [dict(m) for m in messages],
+        }
